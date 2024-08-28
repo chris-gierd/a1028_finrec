@@ -1,62 +1,49 @@
-SELECT * FROM `gierd-finrec.a1028_dev.ebay_orders_manual` LIMIT 10
-
-SELECT distinct type from `gierd-finrec.a1028_dev.ebay_orders_manual`
-
-batch_id
-creation_date
-batch_filename
-transaction_creation_date
-type
-order_number
-legacy_order_id
-buyer_username
-buyer_name
-ship_to_city
-ship_to_province_region_state
-ship_to_zip
-ship_to_country
-net_amount
-payout_currency
-payout_date
-payout_id
-payout_method
-payout_status
-reason_for_hold
-item_id
-transaction_id
-item_title
-custom_label
-quantity
-item_subtotal
-shipping_and_handling
-seller_collected_tax
-ebay_collected_tax
-final_value_fee_fixed
-final_value_fee_variable
-regulatory_operating_fee
-very_high_item_not_as_described_fee
-below_standard_performance_fee
-international_fee
-charity_donation
-deposit_processing_fee
-gross_transaction_amount
-transaction_currency
-exchange_rate
-reference_id
-description
-
 WITH ebay_payout_recon AS(
 SELECT transaction_creation_date
 ,type
 ,order_number
 ,payout_id
 ,transaction_id
+,item_subtotal
 ,gross_transaction_amount
 ,quantity
+,item_id
+,custom_label
 FROM `gierd-finrec.a1028_dev.ebay_orders_manual`
 where 1=1
+--AND order_number in ('16-11850-33616','06-11893-70770','03-11858-51388')
 AND payout_id = '6472238658'
 AND type = 'Order'
 )
-Select payout_id, sum(quantity), sum(item_subtotal), sum(gross_transaction_amount) from ebay_payout_recon
-group by payout_id
+--Select order_number, custom_label, quantity from ebay_payout_recon
+
+-- select et.order_number, et.custom_label, et.quantity from ebay_payout_recon et 
+--   left join `gierd-finrec.a1028_dev.ebay_payout_ 6472238658_orders_recon` pr 
+--     on et.order_number = pr.Order_Number 
+--       AND et.item_id = pr.sku
+--       AND et.quantity = pr.Quantity
+--   where pr.partner = 'Gierd'
+--   AND pr.order_number is not null
+
+
+select et.order_number, et.custom_label, et.quantity, pr.sku, pr.partner from ebay_payout_recon et 
+  left join `gierd-finrec.a1028_dev.ebay_payout_ 6472238658_orders_recon` pr 
+    on et.order_number = pr.Order_Number 
+      AND et.custom_label = pr.sku
+      AND et.quantity = pr.Quantity
+  where 1=1
+  AND pr.order_number is null
+
+  Select transaction_creation_date
+,type
+,order_number
+,payout_id
+,transaction_id
+,item_subtotal
+,gross_transaction_amount
+,quantity
+,item_id
+,custom_label
+FROM `gierd-finrec.a1028_dev.ebay_orders_manual` et
+left join `gierd-finrec.a1028_dev.ebay_payout_ 6472238658_orders_recon` pr
+on et.order_number = pr.order_number
