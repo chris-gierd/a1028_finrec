@@ -1,4 +1,47 @@
---Check which orders aren't getting a unit_cost or 
+-------EDI AMT CHANGES-------
+-----------------------------
+  /*------------
+  Setting edi_submitted_amount
+  --------------*/
+
+  UPDATE sales_report AS t
+  SET t.edi_submitted_amount = CASE WHEN received_date_pst <= '2024-09-01' THEN lo.unit_cost
+      ELSE lo.Line_total_excluding_tax
+    END
+  FROM  `client-datawarehouse.a1028_mart.v_linn_orders_current` AS lo
+  WHERE lo.sku = t.sku
+    AND lo.Quantity = t.quantity
+    AND lo.reference_number = t.marketplace_id;
+
+  ------
+  -- Pass 2 match on LEFT(sku, 12)
+  ------
+
+  UPDATE sales_report as t
+  SET t.edi_submitted_amount = CASE WHEN received_date_pst <= '2024-09-01' THEN lo.unit_cost
+      ELSE lo.Line_total_excluding_tax
+    END
+  FROM `client-datawarehouse.a1028_mart.v_linn_orders_current` lo
+  WHERE LEFT(lo.sku, 12) = LEFT(t.sku, 12)
+    AND lo.Quantity = t.quantity
+    AND lo.reference_number = t.marketplace_id
+    AND t.edi_submitted_amount IS NULL;
+
+  ------
+  -- Pass 3 match on order, quantity, AND date (i.e shipped sku different from order sku)
+  ------
+
+  UPDATE sales_report as t
+  SET t.edi_submitted_amount = CASE WHEN received_date_pst <= '2024-09-01' THEN lo.unit_cost
+      ELSE lo.Line_total_excluding_tax
+    END
+  FROM `client-datawarehouse.a1028_mart.v_linn_orders_current` lo
+  WHERE 1=1
+        AND t.order_id is not null
+        AND t.edi_submitted_amount is null
+        AND t.marketplace_id = lo.reference_number
+        AND t.quantity = lo.Quantity
+        AND t.order_date = lo.received_date_pst
 
 --interrogate matches vs non-matches
   Select t.order_id
