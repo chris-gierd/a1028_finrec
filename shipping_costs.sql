@@ -1,6 +1,10 @@
 -Worked through logic
 
---Fedex roll-up total shipping cost on master tracking for multi-item orders
+  ------
+    --[Pass 3] Update shipping actuals
+    ------
+
+  --Fedex roll-up total shipping cost on master tracking for multi-item orders
   CREATE OR REPLACE TEMP TABLE fedex_charge_details AS
     Select CASE WHEN TDMasterTrackingID IS NULL then Express_or_Ground_Tracking_ID
                 ELSE TDMasterTrackingID
@@ -13,6 +17,25 @@
                 END;
 
   --Join total back to orders and divide by order-items
+  UPDATE sales_report sr
+  SET ship_and_handle_net = f.ship_and_handle_net
+  FROM (SELECT (s.ship_cost_total_order / o.order_quantity) ship_and_handle_net, t.order_id, t.sku FROM `client-datawarehouse.a1028_mart.v_linn_orders_current` t
+          left join fedex_charge_details s
+            on t.tracking_number = s.tracking_master
+          left join sales_report r 
+            on t.order_id = r.order_id
+            and t.sku = r.sku
+          inner join (
+            SELECT order_id, sum(quantity) order_quantity, count(order_id) order_lines
+            FROM `client-datawarehouse.a1028_mart.v_linn_orders_current`
+            group by order_id
+          ) o on o.order_id = t.order_id
+        WHERE 1=1
+            and t.received_date_pst >= var_reporting_date_start) f
+  Where sr.order_id = f.order_id
+  AND sr.sku = f.sku;
+
+  --Detail columns for validation
 WITH tracking_matches as(
   select t.order_id
   ,t.reference_number
