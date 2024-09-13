@@ -1,3 +1,62 @@
+-Worked through logic
+
+--Fedex roll-up total shipping cost on master tracking for multi-item orders
+  CREATE OR REPLACE TEMP TABLE fedex_charge_details AS
+    Select CASE WHEN TDMasterTrackingID IS NULL then Express_or_Ground_Tracking_ID
+                ELSE TDMasterTrackingID
+                END AS tracking_master
+    ,count(Express_or_Ground_Tracking_ID) AS cnt_pkg
+    ,sum(Net_Charge_Amount) ship_cost_total_order
+    from `client-datawarehouse.a1028_raw.fedex_data` 
+    group by CASE WHEN TDMasterTrackingID IS NULL then Express_or_Ground_Tracking_ID
+                ELSE TDMasterTrackingID
+                END;
+
+  --Join total back to orders and divide by order-items
+WITH tracking_matches as(
+  select t.order_id
+  ,t.reference_number
+  ,r.marketplace
+  ,t.tracking_number
+  ,t.received_date_pst
+  ,s.tracking_master
+  ,t.received_date_pst
+  ,t.Processed_date_pst
+  --,s.Shipment_Date
+  ,s.ship_cost_total_order
+  ,s.cnt_pkg
+  ,o.order_lines
+  ,t.Quantity
+  ,o.order_quantity
+  ,(s.ship_cost_total_order / o.order_quantity) as unit_ship_order_average
+  ,r.ship_and_handle_gross
+  ,t.item_title
+  ,t.sku
+  FROM `client-datawarehouse.a1028_mart.v_linn_orders_current` t
+    left join fedex_charge_details s
+      on t.tracking_number = s.tracking_master
+    left join sales_report r 
+        on t.order_id = r.order_id
+        and t.sku = r.sku
+    inner join (
+      SELECT order_id, sum(quantity) order_quantity, count(order_id) order_lines
+      FROM `client-datawarehouse.a1028_mart.v_linn_orders_current`
+      group by order_id
+    ) o on o.order_id = t.order_id
+  WHERE 1=1
+      and t.received_date_pst >= var_reporting_date_start 
+      --and t.Processed_date_pst <= '2024-08-30'
+  )  
+  
+Select order_id, tracking_number, sum(unit_ship_order_average * quantity), count(*) from tracking_matches where tracking_number <> ''
+group by order_id, tracking_number
+having count(order_id) > 1;
+
+Select Shipment_Date, Net_Charge_Amount, Express_or_Ground_Tracking_ID from `client-datawarehouse.a1028_raw.fedex_data` 
+where TDMasterTrackingID = '277796128372';
+
+-------------------------------------------------------------------------
+
 --Size up dates we are trying to cover
 Select min(order_date), max(order_date) from gierd-finrec.a1028_dev.sales_report;
 
